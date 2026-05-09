@@ -103,8 +103,11 @@
               <textarea id="replyText" placeholder="輸入回覆內容..." rows="5"></textarea>
             </div>
 
-            <button class="btn btn-success" style="width:100%;margin-bottom:10px" onclick="sendReply()">
+            <button class="btn btn-success" style="width:100%;margin-bottom:8px" onclick="sendReply()">
               ✅ 確認傳送給客人
+            </button>
+            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px;font-size:13px" onclick="reclassify()">
+              🤖 重新 AI 判斷
             </button>
 
             <div class="form-group">
@@ -258,6 +261,29 @@
     el.textContent = text;
     el.style.color = type === 'success' ? '#00b894' : '#d63031';
     setTimeout(() => el.textContent = '', 3000);
+  }
+
+  async function reclassify() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '🤖 判斷中...';
+    showMsg('AI 判斷中，請稍候...', 'success');
+
+    try {
+      const result = await api('POST', `/api/messages/${msgId}/reclassify`, {});
+      if (result?.ok) {
+        showMsg('AI 判斷完成，重新載入中...', 'success');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        showMsg('AI 判斷失敗：' + (result?.error || '未知錯誤'), 'danger');
+        btn.disabled = false;
+        btn.textContent = '🤖 重新 AI 判斷';
+      }
+    } catch (err) {
+      showMsg('連線失敗', 'danger');
+      btn.disabled = false;
+      btn.textContent = '🤖 重新 AI 判斷';
+    }
   }
 
   function escapeHtml(s) {
