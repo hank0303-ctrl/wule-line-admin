@@ -165,7 +165,22 @@
 
     if (msg.aiSuggestedReply) {
       document.getElementById('aiBox').style.display = 'block';
-      document.getElementById('aiReasoning').textContent = msg.aiReasoning || '';
+      const reasoningEl = document.getElementById('aiReasoning');
+      reasoningEl.textContent = msg.aiReasoning || '';
+
+      // 需要人工處理警示
+      if (msg.aiNeedsHuman) {
+        const warn = document.createElement('div');
+        warn.style.cssText = 'margin-top:6px;padding:6px 10px;background:#fff3cd;border:1px solid #fdcb6e;border-radius:4px;font-size:12px;color:#856404';
+        warn.textContent = '⚠️ AI 建議人工特別處理';
+        reasoningEl.after(warn);
+      }
+
+      // 內部備註
+      if (msg.aiInternalNote) {
+        document.getElementById('notesText').value = msg.aiInternalNote;
+      }
+
       const pct = Math.round((msg.aiCategoryConfidence || 0) * 100);
       document.getElementById('aiConfidenceText').textContent = `信心度 ${pct}%`;
       document.getElementById('confidenceFill').style.width = pct + '%';
