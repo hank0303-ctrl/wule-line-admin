@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 登入</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div style="font-size:40px;margin-bottom:12px">🥊</div>
+    <h2>武樂 LINE 後台</h2>
+    <p>請輸入管理員 Token 登入</p>
+    <div class="form-group">
+      <input type="password" id="tokenInput" placeholder="Admin Token" style="text-align:center" />
+    </div>
+    <p id="errMsg" class="text-danger" style="margin-bottom:10px;font-size:13px;min-height:18px"></p>
+    <button class="btn btn-primary" style="width:100%" onclick="login()">登入</button>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  if (getToken()) window.location.href = 'index.html';
+
+  document.getElementById('tokenInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') login();
+  });
+
+  async function login() {
+    const token = document.getElementById('tokenInput').value.trim();
+    if (!token) return;
+
+    setToken(token);
+    try {
+      const res = await fetch(API_BASE + '/api/stats', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.status === 401) {
+        localStorage.removeItem('admin_token');
+        document.getElementById('errMsg').textContent = 'Token 錯誤，請再試一次';
+      } else {
+        window.location.href = 'index.html';
+      }
+    } catch {
+      document.getElementById('errMsg').textContent = '無法連線至伺服器';
+    }
+  }
+</script>
+</body>
+</html>

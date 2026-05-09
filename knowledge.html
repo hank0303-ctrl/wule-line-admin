@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 知識庫</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-logo">🥊 武樂 <span>LINE 後台</span></div>
+    <nav>
+      <a href="index.html"><span class="icon">💬</span>訊息列表</a>
+      <a href="customers.html"><span class="icon">👥</span>客人管理</a>
+      <a href="stats.html"><span class="icon">📊</span>統計報表</a>
+      <a href="knowledge.html" class="active"><span class="icon">📚</span>知識庫</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="#" onclick="logout()" style="color:#636e72;font-size:12px">登出</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>知識庫管理</h1>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ 新增知識</button>
+    </div>
+
+    <div class="content">
+      <div class="card" style="margin-bottom:16px;background:#fff8e1;border:1px solid #fdcb6e">
+        <strong>💡 提示：</strong>知識庫內容會作為 AI 回覆的依據。請填寫教室的常見問題、課程說明、價格、政策等資訊，讓 AI 回覆更準確。
+      </div>
+
+      <div class="kb-grid" id="kbGrid">
+        <div class="loading">載入中...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:500px;max-width:90vw">
+    <h3 style="margin-bottom:16px" id="modalTitle">新增知識</h3>
+    <input type="hidden" id="editId">
+
+    <div class="form-group">
+      <label>分類</label>
+      <select id="editCategory">
+        <option value="trial_class">體驗課</option>
+        <option value="adult_class">成人課程</option>
+        <option value="kids_boxing">兒童拳擊</option>
+        <option value="camp">寒暑假營隊</option>
+        <option value="afterschool">課後才藝班</option>
+        <option value="payment">付款問題</option>
+        <option value="leave">請假</option>
+        <option value="refund">退費</option>
+        <option value="complaint">客訴</option>
+        <option value="renewal">續購</option>
+        <option value="general_inquiry">一般詢問</option>
+        <option value="other">其他</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>標題（簡短描述這條知識）</label>
+      <input type="text" id="editTitle" placeholder="例：體驗課費用說明">
+    </div>
+
+    <div class="form-group">
+      <label>內容（給 AI 參考的詳細說明）</label>
+      <textarea id="editContent" rows="5" placeholder="例：體驗課費用為 300 元，包含 60 分鐘課程，可試上武術體操或兒童拳擊..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>關鍵字（逗號分隔，幫助分類判斷）</label>
+      <input type="text" id="editKeywords" placeholder="體驗, 試上, 多少錢, 費用">
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveKb()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  checkAuth();
+
+  let items = [];
+
+  function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = 'login.html';
+  }
+
+  async function load() {
+    const data = await api('GET', '/api/knowledge');
+    if (!data) return;
+    items = data.items || [];
+    render();
+  }
+
+  function render() {
+    const container = document.getElementById('kbGrid');
+    if (!items.length) {
+      container.innerHTML = `
+        <div style="grid-column:1/-1" class="empty">
+          還沒有知識庫內容。<br>點擊右上角「新增知識」開始建立，讓 AI 有資料可以參考。
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(item => {
+      const cat = CATEGORIES[item.category] || CATEGORIES.other;
+      return `
+        <div class="kb-item" style="border-color:${cat.color}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            ${categoryBadge(item.category)}
+          </div>
+          <h4>${escapeHtml(item.title)}</h4>
+          <p>${escapeHtml(item.content)}</p>
+          ${item.keywords?.length ? `<div style="margin-top:8px">${item.keywords.map(k => `<span class="badge" style="background:#f5f6fa;color:#636e72;margin:1px">${escapeHtml(k)}</span>`).join('')}</div>` : ''}
+          <div class="kb-footer">
+            <span style="font-size:11px;color:#b2bec3">${item.updatedAt ? formatTime(item.updatedAt) : ''}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary btn-sm" onclick="editKb('${item.id}')">編輯</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteKb('${item.id}', '${escapeJs(item.title)}')">刪除</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function openAddModal() {
+    document.getElementById('editId').value = '';
+    document.getElementById('modalTitle').textContent = '新增知識';
+    document.getElementById('editCategory').value = 'general_inquiry';
+    document.getElementById('editTitle').value = '';
+    document.getElementById('editContent').value = '';
+    document.getElementById('editKeywords').value = '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  function editKb(id) {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('editId').value = id;
+    document.getElementById('modalTitle').textContent = '編輯知識';
+    document.getElementById('editCategory').value = item.category;
+    document.getElementById('editTitle').value = item.title;
+    document.getElementById('editContent').value = item.content;
+    document.getElementById('editKeywords').value = (item.keywords || []).join(', ');
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  async function saveKb() {
+    const id = document.getElementById('editId').value;
+    const body = {
+      category: document.getElementById('editCategory').value,
+      title: document.getElementById('editTitle').value.trim(),
+      content: document.getElementById('editContent').value.trim(),
+      keywords: document.getElementById('editKeywords').value.split(',').map(k => k.trim()).filter(Boolean),
+    };
+
+    if (!body.title || !body.content) {
+      alert('請填寫標題和內容');
+      return;
+    }
+
+    if (id) {
+      await api('PATCH', `/api/knowledge/${id}`, body);
+    } else {
+      await api('POST', '/api/knowledge', body);
+    }
+
+    closeModal();
+    load();
+  }
+
+  async function deleteKb(id, title) {
+    if (!confirm(`確定刪除「${title}」？`)) return;
+    await api('DELETE', `/api/knowledge/${id}`);
+    load();
+  }
+
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function escapeJs(s) {
+    return (s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  }
+
+  load();
+</script>
+</body>
+</html>

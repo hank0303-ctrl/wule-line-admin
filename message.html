@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 訊息詳情</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-logo">🥊 武樂 <span>LINE 後台</span></div>
+    <nav>
+      <a href="index.html"><span class="icon">💬</span>訊息列表</a>
+      <a href="customers.html"><span class="icon">👥</span>客人管理</a>
+      <a href="stats.html"><span class="icon">📊</span>統計報表</a>
+      <a href="knowledge.html"><span class="icon">📚</span>知識庫</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="#" onclick="logout()" style="color:#636e72;font-size:12px">登出</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <a href="index.html" style="color:#636e72;text-decoration:none">← 返回列表</a>
+        <h1 id="pageTitle">訊息詳情</h1>
+      </div>
+      <div id="topActions" style="display:flex;gap:8px"></div>
+    </div>
+
+    <div class="content">
+      <div class="detail-layout" id="detailLayout" style="display:none">
+
+        <!-- Left: chat history -->
+        <div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+              <img id="userAvatar" class="user-avatar" src="" onerror="this.style.display='none'">
+              <div>
+                <div id="userName" style="font-weight:600"></div>
+                <div id="userId" style="font-size:12px;color:#636e72"></div>
+              </div>
+              <div style="margin-left:auto">
+                <a id="customerLink" href="#" style="font-size:12px;color:#0984e3">查看客人資料</a>
+              </div>
+            </div>
+
+            <div style="font-size:12px;color:#636e72;margin-bottom:8px">歷史訊息（同一客人）</div>
+            <div class="chat-history" id="chatHistory">
+              <div class="loading">載入中...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: AI + reply -->
+        <div>
+          <div class="card">
+            <div style="font-weight:600;margin-bottom:14px">本則訊息</div>
+
+            <div class="form-group">
+              <label>分類</label>
+              <select id="categorySelect">
+                <option value="trial_class">體驗課</option>
+                <option value="adult_class">成人課程</option>
+                <option value="kids_boxing">兒童拳擊</option>
+                <option value="camp">寒暑假營隊</option>
+                <option value="afterschool">課後才藝班</option>
+                <option value="payment">付款問題</option>
+                <option value="leave">請假</option>
+                <option value="refund">退費</option>
+                <option value="complaint">客訴</option>
+                <option value="renewal">續購</option>
+                <option value="follow_up">未成交追蹤</option>
+                <option value="general_inquiry">一般詢問</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>處理狀態</label>
+              <select id="statusSelect">
+                <option value="new">未處理</option>
+                <option value="reading">閱讀中</option>
+                <option value="replied">已回覆</option>
+                <option value="done">已結案</option>
+                <option value="follow_up">待追蹤</option>
+              </select>
+            </div>
+
+            <div id="aiBox" class="ai-box" style="display:none">
+              <div class="ai-label">🤖 AI 判斷 <span id="aiConfidenceText" style="margin-left:auto;font-size:10px"></span></div>
+              <div style="font-size:12px;color:#636e72;margin-bottom:4px" id="aiReasoning"></div>
+              <div class="confidence-bar"><div class="confidence-fill" id="confidenceFill" style="width:0%"></div></div>
+            </div>
+
+            <div class="form-group">
+              <label>
+                建議回覆
+                <span id="aiSuggestBtn" onclick="useAiSuggestion()" style="color:#0984e3;cursor:pointer;float:right;font-size:11px">使用 AI 建議 ↓</span>
+              </label>
+              <textarea id="replyText" placeholder="輸入回覆內容..." rows="5"></textarea>
+            </div>
+
+            <button class="btn btn-success" style="width:100%;margin-bottom:10px" onclick="sendReply()">
+              ✅ 確認傳送給客人
+            </button>
+
+            <div class="form-group">
+              <label>備註（僅內部可見）</label>
+              <textarea id="notesText" placeholder="備註..." rows="2"></textarea>
+            </div>
+
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary" style="flex:1" onclick="saveChanges()">儲存變更</button>
+            </div>
+
+            <div id="actionMsg" style="text-align:center;margin-top:10px;font-size:13px;min-height:18px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="loadingMsg" class="loading">載入中...</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  checkAuth();
+
+  const params = new URLSearchParams(location.search);
+  const msgId = params.get('id');
+  let currentMsg = null;
+
+  function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = 'login.html';
+  }
+
+  async function loadMessage() {
+    if (!msgId) { location.href = 'index.html'; return; }
+
+    const msg = await api('GET', `/api/messages/${msgId}`);
+    if (!msg) return;
+
+    currentMsg = msg;
+
+    // Mark as read
+    if (!msg.isRead) api('PATCH', `/api/messages/${msgId}`, { isRead: true });
+
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('detailLayout').style.display = 'grid';
+    document.getElementById('pageTitle').textContent = msg.displayName + ' 的訊息';
+
+    document.getElementById('userName').textContent = msg.displayName || msg.lineUserId;
+    document.getElementById('userId').textContent = msg.lineUserId;
+    document.getElementById('userAvatar').src = '';
+    document.getElementById('customerLink').href = `customers.html?uid=${msg.lineUserId}`;
+
+    document.getElementById('categorySelect').value = msg.category;
+    document.getElementById('statusSelect').value = msg.status;
+    document.getElementById('notesText').value = msg.notes || '';
+
+    if (msg.aiSuggestedReply) {
+      document.getElementById('aiBox').style.display = 'block';
+      document.getElementById('aiReasoning').textContent = msg.aiReasoning || '';
+      const pct = Math.round((msg.aiCategoryConfidence || 0) * 100);
+      document.getElementById('aiConfidenceText').textContent = `信心度 ${pct}%`;
+      document.getElementById('confidenceFill').style.width = pct + '%';
+      document.getElementById('replyText').setAttribute('data-ai', msg.aiSuggestedReply);
+    } else {
+      document.getElementById('aiSuggestBtn').style.display = 'none';
+    }
+
+    if (msg.actualReply) {
+      document.getElementById('replyText').value = msg.actualReply;
+      document.getElementById('replyText').disabled = true;
+    }
+
+    loadChatHistory(msg.lineUserId, msg.timestamp);
+  }
+
+  function useAiSuggestion() {
+    const ai = document.getElementById('replyText').getAttribute('data-ai');
+    if (ai) document.getElementById('replyText').value = ai;
+  }
+
+  async function loadChatHistory(lineUserId, currentTs) {
+    const data = await api('GET', `/api/messages?limit=50`);
+    if (!data) return;
+
+    const history = (data.messages || [])
+      .filter(m => m.lineUserId === lineUserId)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    const container = document.getElementById('chatHistory');
+    if (!history.length) {
+      container.innerHTML = '<div class="empty">無歷史訊息</div>';
+      return;
+    }
+
+    container.innerHTML = history.map(m => `
+      <div class="chat-msg" style="${m.id === msgId ? 'border:2px solid #0984e3' : ''}">
+        <div class="meta">${formatTime(m.timestamp)} · ${categoryBadge(m.category)} ${statusBadge(m.status)}</div>
+        <div class="text">${escapeHtml(m.content)}</div>
+        ${m.actualReply ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #dfe6e9;font-size:12px;color:#00b894">↳ 已回覆：${escapeHtml(m.actualReply)}</div>` : ''}
+      </div>
+    `).join('');
+
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function sendReply() {
+    const text = document.getElementById('replyText').value.trim();
+    if (!text) { showMsg('請輸入回覆內容', 'danger'); return; }
+
+    if (!confirm(`確定傳送以下回覆給客人？\n\n「${text}」`)) return;
+
+    const result = await api('POST', `/api/messages/${msgId}/reply`, { text, repliedBy: 'admin' });
+    if (result?.ok) {
+      showMsg('已傳送！', 'success');
+      document.getElementById('replyText').disabled = true;
+      document.getElementById('statusSelect').value = 'replied';
+      setTimeout(() => location.href = 'index.html', 1500);
+    } else {
+      showMsg('傳送失敗：' + (result?.error || '未知錯誤'), 'danger');
+    }
+  }
+
+  async function saveChanges() {
+    const result = await api('PATCH', `/api/messages/${msgId}`, {
+      category: document.getElementById('categorySelect').value,
+      status: document.getElementById('statusSelect').value,
+      notes: document.getElementById('notesText').value,
+    });
+    showMsg(result?.ok ? '已儲存' : '儲存失敗', result?.ok ? 'success' : 'danger');
+  }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('actionMsg');
+    el.textContent = text;
+    el.style.color = type === 'success' ? '#00b894' : '#d63031';
+    setTimeout(() => el.textContent = '', 3000);
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  loadMessage();
+</script>
+</body>
+</html>

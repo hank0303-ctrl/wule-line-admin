@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 客人管理</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-logo">🥊 武樂 <span>LINE 後台</span></div>
+    <nav>
+      <a href="index.html"><span class="icon">💬</span>訊息列表</a>
+      <a href="customers.html" class="active"><span class="icon">👥</span>客人管理</a>
+      <a href="stats.html"><span class="icon">📊</span>統計報表</a>
+      <a href="knowledge.html"><span class="icon">📚</span>知識庫</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="#" onclick="logout()" style="color:#636e72;font-size:12px">登出</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>客人管理</h1>
+      <input type="text" id="searchInput" placeholder="搜尋名稱..." onkeyup="filterUsers()" style="padding:7px 12px;border:1px solid #dfe6e9;border-radius:6px;font-size:14px;width:200px">
+    </div>
+
+    <div class="content">
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>頭像</th>
+                <th>名稱</th>
+                <th>LINE UID</th>
+                <th>訊息數</th>
+                <th>最後聯繫</th>
+                <th>標籤</th>
+                <th>備註</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="userTable">
+              <tr><td colspan="8" class="loading">載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:420px;max-width:90vw">
+    <h3 style="margin-bottom:16px" id="modalTitle">編輯客人資料</h3>
+    <input type="hidden" id="editUid">
+    <div class="form-group">
+      <label>標籤（逗號分隔）</label>
+      <input type="text" id="editTags" placeholder="潛在客戶, 已報名, VIP...">
+    </div>
+    <div class="form-group">
+      <label>備註</label>
+      <textarea id="editNotes" rows="3"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveUser()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  checkAuth();
+
+  let allUsers = [];
+
+  function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = 'login.html';
+  }
+
+  async function load() {
+    const data = await api('GET', '/api/customers');
+    if (!data) return;
+
+    allUsers = data.users || [];
+
+    // highlight if coming from uid param
+    const params = new URLSearchParams(location.search);
+    const highlightUid = params.get('uid');
+
+    renderTable(allUsers, highlightUid);
+  }
+
+  function filterUsers() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = q ? allUsers.filter(u => u.displayName?.toLowerCase().includes(q)) : allUsers;
+    renderTable(filtered);
+  }
+
+  function renderTable(users, highlightUid) {
+    const tbody = document.getElementById('userTable');
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">無客人資料</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => `
+      <tr style="${u.lineUserId === highlightUid ? 'background:#f0f8ff' : ''}">
+        <td><img class="user-avatar" src="${u.pictureUrl || ''}" onerror="this.style.display='none'"></td>
+        <td><strong>${escapeHtml(u.displayName)}</strong></td>
+        <td style="font-size:11px;color:#b2bec3">${u.lineUserId}</td>
+        <td style="text-align:center">${u.totalMessages || 0}</td>
+        <td style="white-space:nowrap;color:#636e72">${formatTime(u.lastContactAt)}</td>
+        <td>${(u.tags || []).map(t => `<span class="badge" style="background:#6c5ce720;color:#6c5ce7;border:1px solid #6c5ce740;margin:1px">${escapeHtml(t)}</span>`).join('')}</td>
+        <td style="color:#636e72;font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(u.notes)}</td>
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-secondary btn-sm" onclick="editUser('${u.lineUserId}', '${escapeHtml(u.displayName)}', '${escapeJs(JSON.stringify(u.tags||[]))}', '${escapeJs(u.notes||'')}')">編輯</button>
+          <a href="index.html?uid=${u.lineUserId}" class="btn btn-secondary btn-sm">訊息</a>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function editUser(uid, name, tagsJson, notes) {
+    document.getElementById('editUid').value = uid;
+    document.getElementById('modalTitle').textContent = name + ' 的資料';
+    const tags = JSON.parse(tagsJson || '[]');
+    document.getElementById('editTags').value = tags.join(', ');
+    document.getElementById('editNotes').value = notes;
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+  }
+
+  async function saveUser() {
+    const uid = document.getElementById('editUid').value;
+    const tags = document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const notes = document.getElementById('editNotes').value;
+
+    await api('PATCH', `/api/customers/${uid}`, { tags, notes });
+    closeModal();
+    load();
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function escapeJs(s) {
+    return (s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
+  }
+
+  load();
+</script>
+</body>
+</html>

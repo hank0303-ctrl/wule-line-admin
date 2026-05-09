@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 訊息列表</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">🥊 武樂 <span>LINE 後台</span></div>
+    <nav>
+      <a href="index.html" class="active"><span class="icon">💬</span>訊息列表</a>
+      <a href="customers.html"><span class="icon">👥</span>客人管理</a>
+      <a href="stats.html"><span class="icon">📊</span>統計報表</a>
+      <a href="knowledge.html"><span class="icon">📚</span>知識庫</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div id="sidebarStats">載入中...</div>
+      <br>
+      <a href="#" onclick="logout()" style="color:#636e72;font-size:12px">登出</a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <h1>訊息列表</h1>
+      <button class="btn btn-secondary btn-sm" onclick="loadMessages()">重新整理</button>
+    </div>
+
+    <div class="content">
+      <!-- Quick tabs -->
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('all', this)">全部</div>
+        <div class="tab" onclick="switchTab('new', this)">未處理 <span id="newCount" class="badge" style="background:#d6303120;color:#d63031"></span></div>
+        <div class="tab" onclick="switchTab('follow_up', this)">待追蹤</div>
+        <div class="tab" onclick="switchTab('replied', this)">已回覆</div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters">
+        <select id="filterCategory" onchange="loadMessages()">
+          <option value="">全部分類</option>
+          <option value="trial_class">體驗課</option>
+          <option value="adult_class">成人課程</option>
+          <option value="kids_boxing">兒童拳擊</option>
+          <option value="camp">寒暑假營隊</option>
+          <option value="afterschool">課後才藝班</option>
+          <option value="payment">付款問題</option>
+          <option value="leave">請假</option>
+          <option value="refund">退費</option>
+          <option value="complaint">客訴</option>
+          <option value="renewal">續購</option>
+          <option value="follow_up">未成交追蹤</option>
+          <option value="general_inquiry">一般詢問</option>
+          <option value="other">其他</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="搜尋訊息或客人名稱..." onkeyup="filterTable()" style="width:220px">
+      </div>
+
+      <!-- Table -->
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:36px"></th>
+                <th>客人</th>
+                <th>訊息內容</th>
+                <th>分類</th>
+                <th>狀態</th>
+                <th>時間</th>
+                <th style="width:80px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="msgTable">
+              <tr><td colspan="7" class="loading">載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  checkAuth();
+
+  let currentTab = 'all';
+  let allMessages = [];
+
+  function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = 'login.html';
+  }
+
+  async function loadSidebarStats() {
+    const stats = await api('GET', '/api/stats');
+    if (!stats) return;
+    document.getElementById('sidebarStats').innerHTML =
+      `未讀：<strong style="color:#d63031">${stats.unread}</strong> 則<br>今日：${stats.todayCount} 則`;
+    document.getElementById('newCount').textContent = stats.byStatus?.new || 0;
+  }
+
+  async function loadMessages() {
+    const category = document.getElementById('filterCategory').value;
+    let path = '/api/messages?limit=100';
+    if (currentTab !== 'all') path += '&status=' + currentTab;
+    if (category) path += '&category=' + category;
+
+    const data = await api('GET', path);
+    if (!data) return;
+
+    allMessages = data.messages || [];
+    renderTable(allMessages);
+    loadSidebarStats();
+  }
+
+  function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    if (!q) { renderTable(allMessages); return; }
+    const filtered = allMessages.filter(m =>
+      m.content?.toLowerCase().includes(q) ||
+      m.displayName?.toLowerCase().includes(q)
+    );
+    renderTable(filtered);
+  }
+
+  function renderTable(messages) {
+    const tbody = document.getElementById('msgTable');
+    if (!messages.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">沒有訊息</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = messages.map(m => `
+      <tr onclick="window.location='message.html?id=${m.id}'">
+        <td style="text-align:center">${!m.isRead ? '<span class="unread-dot"></span>' : ''}</td>
+        <td>
+          <div style="font-weight:${m.isRead ? 400 : 600}">${m.displayName || m.lineUserId}</div>
+        </td>
+        <td><div class="msg-preview">${escapeHtml(m.content)}</div></td>
+        <td>${categoryBadge(m.category)}</td>
+        <td>${statusBadge(m.status)}</td>
+        <td style="white-space:nowrap;color:#636e72">${formatTime(m.timestamp)}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();window.location='message.html?id=${m.id}'">查看</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    loadMessages();
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  loadMessages();
+  setInterval(loadMessages, 30000); // auto refresh every 30s
+</script>
+</body>
+</html>

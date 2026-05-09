@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 統計報表</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-logo">🥊 武樂 <span>LINE 後台</span></div>
+    <nav>
+      <a href="index.html"><span class="icon">💬</span>訊息列表</a>
+      <a href="customers.html"><span class="icon">👥</span>客人管理</a>
+      <a href="stats.html" class="active"><span class="icon">📊</span>統計報表</a>
+      <a href="knowledge.html"><span class="icon">📚</span>知識庫</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="#" onclick="logout()" style="color:#636e72;font-size:12px">登出</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>統計報表</h1>
+      <button class="btn btn-secondary btn-sm" onclick="load()">重新整理</button>
+    </div>
+
+    <div class="content">
+      <!-- Summary cards -->
+      <div class="stats-grid" id="summaryCards">
+        <div class="stat-card"><div class="num" id="s-total">—</div><div class="label">訊息總數</div></div>
+        <div class="stat-card"><div class="num text-danger" id="s-unread">—</div><div class="label">未讀訊息</div></div>
+        <div class="stat-card"><div class="num" style="color:#e17055" id="s-new">—</div><div class="label">待處理</div></div>
+        <div class="stat-card"><div class="num text-success" id="s-replied">—</div><div class="label">已回覆</div></div>
+        <div class="stat-card"><div class="num" style="color:#fdcb6e" id="s-follow">—</div><div class="label">待追蹤</div></div>
+        <div class="stat-card"><div class="num" style="color:#0984e3" id="s-today">—</div><div class="label">今日訊息</div></div>
+      </div>
+
+      <!-- Category breakdown -->
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:16px">訊息分類排行</div>
+        <div id="categoryChart"></div>
+      </div>
+
+      <!-- Status breakdown -->
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:16px">處理狀態分佈</div>
+        <div id="statusChart"></div>
+      </div>
+
+      <!-- Need follow-up list -->
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:16px">需追蹤名單</div>
+        <div id="followUpList"><div class="loading">載入中...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  checkAuth();
+
+  function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = 'login.html';
+  }
+
+  async function load() {
+    const [stats, messagesData] = await Promise.all([
+      api('GET', '/api/stats'),
+      api('GET', '/api/messages?limit=200'),
+    ]);
+
+    if (!stats) return;
+
+    document.getElementById('s-total').textContent = stats.total;
+    document.getElementById('s-unread').textContent = stats.unread;
+    document.getElementById('s-new').textContent = stats.byStatus?.new || 0;
+    document.getElementById('s-replied').textContent = stats.byStatus?.replied || 0;
+    document.getElementById('s-follow').textContent = stats.byStatus?.follow_up || 0;
+    document.getElementById('s-today').textContent = stats.todayCount;
+
+    renderBarChart('categoryChart', stats.byCategory || {}, CATEGORIES, stats.total);
+    renderBarChart('statusChart', stats.byStatus || {}, STATUSES, stats.total);
+
+    if (messagesData) {
+      const followUps = (messagesData.messages || []).filter(m => m.status === 'follow_up');
+      renderFollowUpList(followUps);
+    }
+  }
+
+  function renderBarChart(containerId, data, labelMap, total) {
+    const container = document.getElementById(containerId);
+    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    const max = sorted[0]?.[1] || 1;
+
+    container.innerHTML = sorted.map(([key, count]) => {
+      const info = labelMap[key] || { label: key, color: '#dfe6e9' };
+      const pct = Math.round(count / (total || 1) * 100);
+      const barWidth = Math.round(count / max * 100);
+      return `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:90px;text-align:right;font-size:12px;color:#636e72;flex-shrink:0">${info.label}</div>
+          <div style="flex:1;background:#f5f6fa;border-radius:4px;height:22px;overflow:hidden">
+            <div style="width:${barWidth}%;background:${info.color};height:100%;border-radius:4px;transition:width .3s"></div>
+          </div>
+          <div style="width:60px;font-size:13px;font-weight:600">${count} <span style="color:#b2bec3;font-weight:400;font-size:11px">(${pct}%)</span></div>
+        </div>`;
+    }).join('') || '<div class="empty">無資料</div>';
+  }
+
+  function renderFollowUpList(messages) {
+    const container = document.getElementById('followUpList');
+    if (!messages.length) {
+      container.innerHTML = '<div class="empty">目前無待追蹤項目</div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table>
+        <thead><tr><th>客人</th><th>最近訊息</th><th>時間</th><th></th></tr></thead>
+        <tbody>
+          ${messages.map(m => `
+            <tr>
+              <td><strong>${m.displayName}</strong></td>
+              <td><div class="msg-preview">${escapeHtml(m.content)}</div></td>
+              <td style="white-space:nowrap;color:#636e72">${formatTime(m.timestamp)}</td>
+              <td><a href="message.html?id=${m.id}" class="btn btn-secondary btn-sm">查看</a></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  load();
+</script>
+</body>
+</html>
