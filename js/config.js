@@ -6,6 +6,7 @@ const CATEGORIES = {
   adult_class: { label: '成人課程', color: '#0984e3' },
   kids_boxing: { label: '兒童拳擊', color: '#00b894' },
   camp: { label: '寒暑假營隊', color: '#fd79a8' },
+  senior_class: { label: '樂齡課程', color: '#00a8a8' },
   afterschool: { label: '課後才藝班', color: '#fdcb6e' },
   payment: { label: '付款問題', color: '#e17055' },
   leave: { label: '請假', color: '#81ecec' },
@@ -53,6 +54,7 @@ async function api(method, path, body) {
 }
 
 function checkAuth() {
+  if (['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
   if (!getToken()) {
     window.location.href = 'login.html';
   }

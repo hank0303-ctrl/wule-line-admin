@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武樂 LINE 後台 — 行銷月曆</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-logo">🥊 武樂 <span>LINE 後台</span></div>
+    <nav>
+      <a href="index.html"><span class="icon">💬</span>訊息列表</a>
+      <a href="customers.html"><span class="icon">👥</span>客人管理</a>
+      <a href="stats.html"><span class="icon">📊</span>統計報表</a>
+      <a href="marketing.html" class="active"><span class="icon">📅</span>行銷月曆</a>
+      <a href="knowledge.html"><span class="icon">📚</span>知識庫</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="#" onclick="logout()" style="color:#636e72;font-size:12px">登出</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>武樂行銷任務中控台</h1>
+      <div class="calendar-tools">
+        <input id="monthInput" type="month" class="inline-input" style="width:150px" onchange="renderAll()">
+        <button class="btn btn-secondary btn-sm" onclick="generateMonthPlan()">產生本月排程</button>
+        <button class="btn btn-primary btn-sm" onclick="openTaskModal()">+ 新增行銷任務</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="marketing-hero">
+        <div class="card">
+          <div class="section-title">本月建議宣傳排程 <span>可一鍵轉成下方任務卡</span></div>
+          <div id="monthPlan" class="month-plan"></div>
+        </div>
+        <div class="card">
+          <div class="section-title">AI 產出區 <span id="outputHint">點任務旁按鈕產生內容</span></div>
+          <div id="aiOutput" class="ai-output">尚未產生內容。</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+            <button class="btn btn-secondary btn-sm" onclick="copyOutput()">複製內容</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">行銷月曆 <span id="taskCount"></span></div>
+        <div class="filters">
+          <select id="platformFilter" onchange="renderTasks()"></select>
+          <select id="statusFilter" onchange="renderTasks()"></select>
+          <input id="taskSearch" type="text" placeholder="搜尋主題、客群、備註..." onkeyup="renderTasks()" style="width:230px">
+        </div>
+        <div id="taskGrid" class="marketing-grid"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">客戶追蹤建議 <span>依客戶分類快速產生下一步</span></div>
+        <div class="filters">
+          <select id="trackingCategory" onchange="renderTrackingAdvice()">
+            <option value="trial_class">體驗課</option>
+            <option value="camp">寒暑假營隊</option>
+            <option value="senior_class">樂齡課程</option>
+          </select>
+          <select id="trackingStage" onchange="renderTrackingAdvice()"></select>
+        </div>
+        <div id="trackingAdvice" class="ai-box" style="margin-bottom:0"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">宣傳主題資料庫 <span>AI 文案會依這些定位與語氣產出</span></div>
+        <div id="topicGrid" class="marketing-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="taskModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:720px;max-width:94vw;max-height:92vh;overflow:auto">
+    <h3 style="margin-bottom:16px" id="taskModalTitle">新增行銷任務</h3>
+    <input type="hidden" id="editTaskId">
+    <div class="status-selects" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div class="form-group">
+        <label>日期</label>
+        <input type="date" id="taskDate">
+      </div>
+      <div class="form-group">
+        <label>宣傳主題</label>
+        <input type="text" id="taskTheme" placeholder="例：65歲以上樂齡運動體驗月">
+      </div>
+      <div class="form-group">
+        <label>目標客群</label>
+        <input type="text" id="taskAudience" placeholder="例：65歲以上長輩與子女">
+      </div>
+      <div class="form-group">
+        <label>推廣平台</label>
+        <select id="taskPlatform"></select>
+      </div>
+      <div class="form-group">
+        <label>宣傳目的</label>
+        <input type="text" id="taskGoal" placeholder="例：引導私訊詢問體驗">
+      </div>
+      <div class="form-group">
+        <label>文案狀態</label>
+        <select id="taskCopyStatus"></select>
+      </div>
+      <div class="form-group">
+        <label>圖片狀態</label>
+        <select id="taskImageStatus"></select>
+      </div>
+      <div class="form-group">
+        <label>發布狀態</label>
+        <select id="taskPublishStatus"></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>成效紀錄</label>
+      <textarea id="taskResult" rows="2" placeholder="例：私訊 3 人、報名 1 人、互動偏低"></textarea>
+    </div>
+    <div class="form-group">
+      <label>備註</label>
+      <textarea id="taskNotes" rows="2" placeholder="內部提醒、優惠期限、素材方向..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeTaskModal()">取消</button>
+      <button class="btn btn-danger" id="deleteTaskBtn" onclick="deleteTask()" style="display:none">刪除</button>
+      <button class="btn btn-primary" onclick="saveTask()">儲存任務</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+  checkAuth();
+
+  const STORE_KEY = 'wule_marketing_tasks_v1';
+  const PLATFORMS = ['LINE 官方帳號', 'IG 貼文', 'IG 限動', 'Facebook 社團', '私訊追蹤', '現場公告'];
+  const TASK_STATUSES = ['待規劃', '待產文案', '待製圖', '待發布', '已發布', '需優化'];
+  const statusColors = {
+    '待規劃': '#636e72',
+    '待產文案': '#6c5ce7',
+    '待製圖': '#e17055',
+    '待發布': '#0984e3',
+    '已發布': '#00b894',
+    '需優化': '#d63031',
+  };
+
+  const topics = [
+    {
+      key: 'senior',
+      title: '65歲以上樂齡運動',
+      color: '#00a8a8',
+      position: '65歲以上不是不能運動，而是需要更安全、更溫和、更有人陪伴的運動方式。',
+      points: ['出門活動比一直待在家更重要', '運動可以從溫和、簡單、安全開始', '不是高強度訓練，而是陪伴式健康活動', '適合改善活動力、平衡感、肌力、柔軟度', '可打給子女，讓子女幫爸媽安排'],
+      courses: ['哈達瑜伽', 'ARC 脊椎訓練', '樂齡階梯', '樂齡飛輪', '溫和伸展', '瑜伽輪長輩友善版'],
+      slogans: ['給爸媽一個安心出門運動的理由', '越不動，身體越退化；安全地動，生活更自在', '不是激烈運動，是溫和陪伴式活動', '65歲以上，也可以慢慢練回身體的穩定感', '出門動一動，身體才會越來越輕鬆']
+    },
+    {
+      key: 'camp',
+      title: '2026 暑假營隊',
+      color: '#fd79a8',
+      position: '不是單純放電，而是讓孩子在運動挑戰中建立自信、勇氣與韌性。',
+      points: ['武術、拳擊、翻滾、舞蹈、游泳等多元運動', '每週四戶外教學', '適合想讓孩子遠離螢幕、增加活動量的家庭', '孩子會流汗、會挑戰、也會慢慢變勇敢', '有主要老師、教練與助教照顧'],
+      courses: ['全能運動挑戰營', '戶外教學', '武術拳擊', '翻滾舞蹈', '游泳活動'],
+      slogans: ['熱血夏季｜走出戶外大冒險', '全能運動挑戰營', '讓孩子離開螢幕，走進真正的運動冒險', '會流汗、會挑戰，也會變得更勇敢', '不是放電而已，是一次真正的成長冒險']
+    },
+    {
+      key: 'adult',
+      title: '成人課程穩定度修復',
+      color: '#0984e3',
+      position: '近期因課程人數變動，教室需要重新整理課程安排，讓學員更安心預約。',
+      points: ['教室有聽到大家對停課的感受', '後續會調整課程安排，提升開課穩定度', '優先保留需求較穩定的時段', '部分課程可能調整成主題課、小班課或體驗活動', '讓學員知道教室正在處理，而不是放著不管'],
+      courses: ['成人拳擊', '哈達瑜伽', 'ARC 脊椎訓練', '主題小班課'],
+      slogans: ['我們有聽到大家對課程穩定度的在意', '接下來會把時段安排得更清楚、更安心', '讓成人學員可以更放心預約與持續練習']
+    }
+  ];
+
+  const trackingAdvice = {
+    trial_class: {
+      '尚未預約': ['提醒可先從新手友善課程開始', '降低第一次上課壓力，提供可選時段', '引導對方回覆方便的日期'],
+      '已體驗未購買': ['詢問上課感受', '根據需求推薦適合方案', '給出下一次預約或購買的低壓力選項'],
+      '已購買': ['提醒如何預約', '提醒開啟 LINE 通知', '給新手第一次正式上課的小提醒']
+    },
+    camp: {
+      '問過但未報名': ['提醒名額與優惠期限', '強調每週四戶外教學與多元運動', '用家長角度說明孩子會被照顧'],
+      '已報名未付訂金': ['提醒完成訂金才算報名完成', '附上付款方式與保留期限', '語氣保持親切明確'],
+      '舊生家長': ['提供舊生優惠或兄弟姊妹優惠', '提醒孩子熟悉環境更容易進入狀況', '詢問想報名的週次']
+    },
+    senior_class: {
+      '子女詢問': ['強調安全、溫和、陪伴', '說明不是激烈訓練，而是友善活動', '邀請先帶爸媽來看看環境'],
+      '長輩本人詢問': ['強調不用擔心跟不上', '可以從簡單動作開始', '提醒穿著舒服、慢慢來就好'],
+      '已體驗': ['追蹤身體感受', '詢問下次方便預約時間', '推薦最溫和且固定的入門課']
+    }
+  };
+
+  function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = 'login.html';
+  }
+
+  function init() {
+    const now = new Date();
+    document.getElementById('monthInput').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    fillSelect('taskPlatform', PLATFORMS);
+    fillSelect('taskCopyStatus', TASK_STATUSES);
+    fillSelect('taskImageStatus', TASK_STATUSES);
+    fillSelect('taskPublishStatus', TASK_STATUSES);
+    fillSelect('platformFilter', ['全部平台', ...PLATFORMS]);
+    fillSelect('statusFilter', ['全部狀態', ...TASK_STATUSES]);
+    renderAll();
+  }
+
+  function fillSelect(id, options) {
+    document.getElementById(id).innerHTML = options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+  }
+
+  function loadTasks() {
+    return JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+  }
+
+  function saveTasks(tasks) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(tasks));
+  }
+
+  function renderAll() {
+    renderPlanPreview();
+    renderTasks();
+    renderTopics();
+    renderTrackingStages();
+    renderTrackingAdvice();
+  }
+
+  function renderPlanPreview() {
+    const plan = [
+      ['第1週', '樂齡運動觀念文', '暑假營隊特色介紹', '現有學員安心公告'],
+      ['第2週', '樂齡課程單堂介紹', '營隊戶外教學亮點', '私訊追蹤舊生家長'],
+      ['第3週', '樂齡學員招募文', '營隊倒數優惠文', '成人課程主題推廣'],
+      ['第4週', '成效回顧', '下月課表預告', '續購與未成交追蹤']
+    ];
+    document.getElementById('monthPlan').innerHTML = plan.map(week => `
+      <div class="week-box">
+        <strong>${week[0]}</strong>
+        <div>${week[1]}</div>
+        <div>${week[2]}</div>
+        <div>${week[3]}</div>
+      </div>
+    `).join('');
+  }
+
+  function generateMonthPlan() {
+    const [year, month] = document.getElementById('monthInput').value.split('-').map(Number);
+    const templates = [
+      ['樂齡運動觀念文', '65歲以上長輩與子女', 'LINE 官方帳號', '建立安全運動觀念與詢問意願'],
+      ['2026 暑假營隊特色介紹', '國小家長與小朋友', 'IG 貼文', '讓家長理解營隊不是只有放電'],
+      ['成人課程安心公告', '既有成人課程學員', 'LINE 官方帳號', '修復停課疑慮並建立信任'],
+      ['樂齡課程單堂介紹', '想溫和運動的長輩', 'Facebook 社團', '推廣適合入門的課程'],
+      ['營隊戶外教學亮點', '重視孩子戶外體驗的家長', 'IG 限動', '增加營隊期待感'],
+      ['私訊追蹤舊生家長', '舊生家長', '私訊追蹤', '提醒優惠與週次名額'],
+      ['樂齡學員招募文', '65歲以上長輩與子女', 'Facebook 社團', '招募體驗與預約參觀'],
+      ['營隊倒數優惠文', '尚未報名的家長', 'LINE 官方帳號', '推動報名決策'],
+      ['成人課程主題推廣', '成人運動學員', 'IG 貼文', '提高成人課程參與動機'],
+      ['成效回顧', '內部團隊', '現場公告', '記錄本月有效素材'],
+      ['下月課表預告', '全體學員', 'LINE 官方帳號', '提前安排預約與續購'],
+      ['續購與未成交追蹤', '體驗未購買與舊生', '私訊追蹤', '把詢問轉成下一步行動']
+    ];
+    const dates = [2, 4, 6, 9, 11, 13, 16, 18, 20, 23, 25, 27];
+    const newTasks = templates.map((t, i) => ({
+      id: crypto.randomUUID(),
+      date: `${year}-${String(month).padStart(2, '0')}-${String(dates[i]).padStart(2, '0')}`,
+      theme: t[0],
+      audience: t[1],
+      platform: t[2],
+      goal: t[3],
+      copyStatus: '待產文案',
+      imageStatus: i % 3 === 0 ? '待製圖' : '待規劃',
+      publishStatus: '待發布',
+      result: '',
+      notes: '本月自動排程，可依實際課表調整日期。',
+      createdAt: new Date().toISOString()
+    }));
+    const existing = loadTasks().filter(t => !t.date.startsWith(document.getElementById('monthInput').value));
+    saveTasks([...existing, ...newTasks]);
+    renderTasks();
+  }
+
+  function renderTasks() {
+    const month = document.getElementById('monthInput').value;
+    const platform = document.getElementById('platformFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const q = document.getElementById('taskSearch').value.trim().toLowerCase();
+    let tasks = loadTasks().filter(t => t.date?.startsWith(month));
+    if (platform && platform !== '全部平台') tasks = tasks.filter(t => t.platform === platform);
+    if (status && status !== '全部狀態') tasks = tasks.filter(t => [t.copyStatus, t.imageStatus, t.publishStatus].includes(status));
+    if (q) tasks = tasks.filter(t => [t.theme, t.audience, t.platform, t.goal, t.result, t.notes].some(v => (v || '').toLowerCase().includes(q)));
+    tasks.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    document.getElementById('taskCount').textContent = `${tasks.length} 個任務`;
+
+    if (!tasks.length) {
+      document.getElementById('taskGrid').innerHTML = '<div class="empty" style="grid-column:1/-1">本月還沒有行銷任務。可新增任務，或點「產生本月排程」。</div>';
+      return;
+    }
+
+    document.getElementById('taskGrid').innerHTML = tasks.map(t => `
+      <div class="task-card">
+        <div style="display:flex;justify-content:space-between;gap:10px">
+          <div>
+            <div style="font-size:12px;color:#636e72">${escapeHtml(t.date)}</div>
+            <div class="task-title">${escapeHtml(t.theme)}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="openTaskModal('${t.id}')">編輯</button>
+        </div>
+        <div class="task-meta">
+          <span class="badge" style="background:#0984e320;color:#0984e3;border:1px solid #0984e340">${escapeHtml(t.platform)}</span>
+          <span class="badge" style="background:#00b89420;color:#00b894;border:1px solid #00b89440">${escapeHtml(t.audience)}</span>
+        </div>
+        <div class="task-purpose">${escapeHtml(t.goal || '尚未填寫宣傳目的')}</div>
+        <div class="status-selects">
+          ${statusControl(t.id, 'copyStatus', t.copyStatus)}
+          ${statusControl(t.id, 'imageStatus', t.imageStatus)}
+          ${statusControl(t.id, 'publishStatus', t.publishStatus)}
+        </div>
+        <textarea class="inline-textarea mt-8" placeholder="成效紀錄" onblur="updateTaskField('${t.id}','result',this.value)">${escapeHtml(t.result)}</textarea>
+        <textarea class="inline-textarea mt-8" placeholder="備註" onblur="updateTaskField('${t.id}','notes',this.value)">${escapeHtml(t.notes)}</textarea>
+        <div class="task-actions">
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','line')">產生 LINE 文案</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','ig')">產生 IG 文案</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','facebook')">產生 Facebook 社團文案</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','dm')">產生私訊追蹤文案</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','image')">產生圖片製作提示詞</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','optimize')">重新優化文案</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','next')" style="grid-column:1/-1">產生下一步追蹤建議</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function statusControl(id, field, value) {
+    const label = field === 'copyStatus' ? '文案' : field === 'imageStatus' ? '圖片' : '發布';
+    return `<select title="${label}狀態" onchange="updateTaskField('${id}','${field}',this.value)">${TASK_STATUSES.map(s => `<option value="${s}" ${s === value ? 'selected' : ''}>${label}：${s}</option>`).join('')}</select>`;
+  }
+
+  function updateTaskField(id, field, value) {
+    const tasks = loadTasks();
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    task[field] = value;
+    task.updatedAt = new Date().toISOString();
+    saveTasks(tasks);
+  }
+
+  function openTaskModal(id) {
+    const task = id ? loadTasks().find(t => t.id === id) : null;
+    document.getElementById('editTaskId').value = task?.id || '';
+    document.getElementById('taskModalTitle').textContent = task ? '編輯行銷任務' : '新增行銷任務';
+    document.getElementById('deleteTaskBtn').style.display = task ? 'inline-block' : 'none';
+    document.getElementById('taskDate').value = task?.date || new Date().toISOString().slice(0, 10);
+    document.getElementById('taskTheme').value = task?.theme || '';
+    document.getElementById('taskAudience').value = task?.audience || '';
+    document.getElementById('taskPlatform').value = task?.platform || 'LINE 官方帳號';
+    document.getElementById('taskGoal').value = task?.goal || '';
+    document.getElementById('taskCopyStatus').value = task?.copyStatus || '待規劃';
+    document.getElementById('taskImageStatus').value = task?.imageStatus || '待規劃';
+    document.getElementById('taskPublishStatus').value = task?.publishStatus || '待規劃';
+    document.getElementById('taskResult').value = task?.result || '';
+    document.getElementById('taskNotes').value = task?.notes || '';
+    document.getElementById('taskModal').style.display = 'flex';
+  }
+
+  function closeTaskModal() {
+    document.getElementById('taskModal').style.display = 'none';
+  }
+
+  function saveTask() {
+    const body = {
+      id: document.getElementById('editTaskId').value || crypto.randomUUID(),
+      date: document.getElementById('taskDate').value,
+      theme: document.getElementById('taskTheme').value.trim(),
+      audience: document.getElementById('taskAudience').value.trim(),
+      platform: document.getElementById('taskPlatform').value,
+      goal: document.getElementById('taskGoal').value.trim(),
+      copyStatus: document.getElementById('taskCopyStatus').value,
+      imageStatus: document.getElementById('taskImageStatus').value,
+      publishStatus: document.getElementById('taskPublishStatus').value,
+      result: document.getElementById('taskResult').value.trim(),
+      notes: document.getElementById('taskNotes').value.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    if (!body.date || !body.theme) {
+      alert('請填寫日期與宣傳主題');
+      return;
+    }
+    const tasks = loadTasks();
+    const idx = tasks.findIndex(t => t.id === body.id);
+    if (idx >= 0) tasks[idx] = { ...tasks[idx], ...body };
+    else tasks.push({ ...body, createdAt: new Date().toISOString() });
+    saveTasks(tasks);
+    closeTaskModal();
+    renderTasks();
+  }
+
+  function deleteTask() {
+    const id = document.getElementById('editTaskId').value;
+    if (!id || !confirm('確定刪除這個行銷任務？')) return;
+    saveTasks(loadTasks().filter(t => t.id !== id));
+    closeTaskModal();
+    renderTasks();
+  }
+
+  function findTopic(task) {
+    const text = `${task.theme} ${task.audience} ${task.goal}`.toLowerCase();
+    if (text.includes('樂齡') || text.includes('65') || text.includes('長輩')) return topics[0];
+    if (text.includes('營隊') || text.includes('暑假') || text.includes('孩子') || text.includes('家長')) return topics[1];
+    if (text.includes('成人') || text.includes('停課') || text.includes('穩定')) return topics[2];
+    return topics[1];
+  }
+
+  function generateAi(id, type) {
+    const task = loadTasks().find(t => t.id === id);
+    if (!task) return;
+    const topic = findTopic(task);
+    const slogan = topic.slogans[0];
+    const base = { task, topic, slogan };
+    const generators = {
+      line: makeLineCopy,
+      ig: makeIgCopy,
+      facebook: makeFacebookCopy,
+      dm: makeDmCopy,
+      image: makeImagePrompt,
+      optimize: makeOptimizeCopy,
+      next: makeNextStep
+    };
+    const output = generators[type](base);
+    document.getElementById('aiOutput').textContent = output;
+    document.getElementById('outputHint').textContent = `${task.theme}｜${labelForType(type)}`;
+    task.copyStatus = ['line', 'ig', 'facebook', 'dm', 'optimize'].includes(type) ? '待發布' : task.copyStatus;
+    task.imageStatus = type === 'image' ? '待製圖' : task.imageStatus;
+    saveTasks(loadTasks().map(t => t.id === id ? task : t));
+    renderTasks();
+  }
+
+  function makeLineCopy({ task, topic, slogan }) {
+    return `【${task.theme}】\n${slogan}\n\n${topic.position}\n\n這次想邀請：${task.audience}\n適合方向：${topic.courses.slice(0, 3).join('、')}\n\n如果你想了解課程、體驗時段或報名方式，直接回覆「想了解」，我們會幫你安排適合的下一步。`;
+  }
+
+  function makeIgCopy({ task, topic, slogan }) {
+    return `${slogan}\n\n${topic.position}\n\n${topic.points.slice(0, 4).map(p => `・${p}`).join('\n')}\n\n這不是一次普通宣傳，而是希望讓 ${task.audience} 看見：運動可以很有力量，也可以很安心。\n\n想了解 ${task.theme}，歡迎私訊我們。\n#武樂運動空間 #${topic.title.replace(/\s/g, '')} #運動日常`;
+  }
+
+  function makeFacebookCopy({ task, topic, slogan }) {
+    return `跟附近的家長和朋友分享一個武樂最近在推的方向：${task.theme}。\n\n${topic.position}\n\n我們希望這件事不是硬推課程，而是真的回到大家的需求：${task.goal || '找到適合自己的運動安排'}。\n\n${topic.points.slice(0, 3).join('、')}。\n\n如果你家裡剛好有需要，或想先問問看適不適合，都可以私訊我們。`;
+  }
+
+  function makeDmCopy({ task, topic }) {
+    return `嗨，想跟你提醒一下武樂最近有「${task.theme}」。\n\n看你之前有詢問過相關課程，我覺得這個方向可能蠻適合你參考：${topic.points[0]}。\n\n不用急著決定，如果你願意，我可以先幫你看哪一個時段或課程比較適合。`;
+  }
+
+  function makeOptimizeCopy({ task, topic, slogan }) {
+    const sensitive = topic.key === 'adult';
+    return `優化後文案方向：\n${slogan}\n\n${sensitive ? '我們有聽到大家對課程穩定度的在意，接下來會把課程安排整理得更清楚，讓大家更安心預約與持續練習。' : topic.position}\n\n請把重點放在「${task.goal || '讓對方願意詢問下一步'}」，文案不要一次塞太多資訊，最後只留一個行動：回覆、私訊或預約。`;
+  }
+
+  function makeNextStep({ task, topic }) {
+    return `下一步追蹤建議：\n1. 先確認此任務是否已發布，若尚未發布，把發布狀態改成「待發布」。\n2. 發布後 24 小時記錄成效：觸及、留言、私訊、實際預約。\n3. 若互動低，改用更直接的標題：「${topic.slogans[1] || topic.slogans[0]}」。\n4. 對已互動但未成交者，使用私訊低壓提醒：先詢問需求，再提供 1 個明確時段或方案。\n5. 備註本次素材哪一句有效，下月排程優先沿用。`;
+  }
+
+  function makeImagePrompt({ task, topic, slogan }) {
+    const isSenior = topic.key === 'senior';
+    const isCamp = topic.key === 'camp';
+    return `圖片主題：${task.theme}\n目標客群：${task.audience}\n主要標題：${slogan}\n副標：${isSenior ? '溫和、安全、有人陪伴的樂齡友善課程' : isCamp ? '讓孩子離開螢幕，走進真正的運動冒險' : '讓成人學員更安心預約與持續練習'}\n畫面風格：溫暖、明亮、乾淨、有信任感\n人物設定：${isSenior ? '健康開心的長輩，正在做簡單伸展或輕運動' : isCamp ? '小朋友在教練陪伴下進行運動挑戰，表情專注開心' : '成人學員在明亮教室中專注練習，氣氛穩定安心'}\n背景設定：乾淨明亮的武樂運動教室\n色系：米白、淺綠、溫暖橘，搭配武樂品牌黑白作為輔助\n版面比例：1:1、4:5、16:9 可選\n圖片中文字：${task.theme}｜${slogan}\n不可出現的元素：不要醫療感、不要復健中心感、不要太像醫院、不要過度激烈或危險動作`;
+  }
+
+  function labelForType(type) {
+    return { line: 'LINE 文案', ig: 'IG 文案', facebook: 'Facebook 社團文案', dm: '私訊追蹤文案', image: '圖片製作提示詞', optimize: '優化文案', next: '下一步追蹤建議' }[type];
+  }
+
+  function renderTrackingStages() {
+    const cat = document.getElementById('trackingCategory').value;
+    const stages = Object.keys(trackingAdvice[cat]);
+    const current = document.getElementById('trackingStage').value;
+    fillSelect('trackingStage', stages);
+    if (stages.includes(current)) document.getElementById('trackingStage').value = current;
+  }
+
+  function renderTrackingAdvice() {
+    renderTrackingStages();
+    const cat = document.getElementById('trackingCategory').value;
+    const stage = document.getElementById('trackingStage').value;
+    const catLabel = CATEGORIES[cat]?.label || cat;
+    const items = trackingAdvice[cat][stage] || [];
+    document.getElementById('trackingAdvice').innerHTML = `
+      <div class="ai-label">追蹤建議：${escapeHtml(catLabel)}｜${escapeHtml(stage)}</div>
+      <div class="ai-text">${items.map(i => `・${escapeHtml(i)}`).join('<br>')}</div>
+    `;
+  }
+
+  function renderTopics() {
+    document.getElementById('topicGrid').innerHTML = topics.map(t => `
+      <div class="topic-card" style="border-color:${t.color}">
+        <h4>${escapeHtml(t.title)}</h4>
+        <p><strong>定位：</strong>${escapeHtml(t.position)}</p>
+        <ul>${t.points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+        <p><strong>適合課程：</strong>${escapeHtml(t.courses.join('、'))}</p>
+        <div style="margin-top:8px">${t.slogans.map(s => `<span class="badge" style="background:${t.color}18;color:${t.color};border:1px solid ${t.color}38;margin:2px">${escapeHtml(s)}</span>`).join('')}</div>
+      </div>
+    `).join('');
+  }
+
+  async function copyOutput() {
+    const text = document.getElementById('aiOutput').textContent;
+    await navigator.clipboard.writeText(text);
+    document.getElementById('outputHint').textContent = '已複製';
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  init();
+</script>
+</body>
+</html>
