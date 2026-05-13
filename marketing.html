@@ -404,7 +404,7 @@
         <div class="task-actions">
           <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','smart')">產文案</button>
           <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','dm')">追蹤訊息</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','image')">圖片提示</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','canva')">Canva 製圖包</button>
           <button class="btn btn-success btn-sm" onclick="markPublished('${t.id}')">已發布</button>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
@@ -516,6 +516,7 @@
       facebook: makeFacebookCopy,
       dm: makeDmCopy,
       image: makeImagePrompt,
+      canva: makeCanvaBrief,
       optimize: makeOptimizeCopy,
       next: makeNextStep
     };
@@ -571,8 +572,73 @@
     return `圖片主題：${task.theme}\n目標客群：${task.audience}\n主要標題：${slogan}\n副標：${isSenior ? '溫和、安全、有人陪伴的樂齡友善課程' : isCamp ? '讓孩子離開螢幕，走進真正的運動冒險' : isYoga ? '下班後放鬆伸展，重新找回身體節奏' : '讓成人學員更安心預約與持續練習'}\n畫面風格：溫暖、明亮、乾淨、有信任感\n人物設定：${isSenior ? '健康開心的長輩，正在做簡單伸展或輕運動' : isCamp ? '小朋友在教練陪伴下進行運動挑戰，表情專注開心' : isYoga ? '成人學員在瑜伽墊上做穩定伸展或流動動作，表情放鬆專注' : '成人學員在明亮教室中專注練習，氣氛穩定安心'}\n背景設定：乾淨明亮的武樂運動教室\n色系：米白、淺綠、溫暖橘，搭配武樂品牌黑白作為輔助\n版面比例：1:1、4:5、16:9 可選\n圖片中文字：${task.theme}｜${slogan}\n不可出現的元素：不要醫療感、不要復健中心感、不要太像醫院、不要營隊感、不要小朋友主視覺、不要過度激烈或危險動作`;
   }
 
+  function makeCanvaBrief({ task, topic, slogan }) {
+    const isSenior = topic.key === 'senior';
+    const isCamp = topic.key === 'camp';
+    const isYoga = topic.key === 'adult_yoga';
+    const subtitle = isSenior
+      ? '溫和、安全、有人陪伴的樂齡友善課程'
+      : isCamp
+        ? '不是放電而已，是一次真正的成長冒險'
+        : isYoga
+          ? '下班後放鬆伸展，重新找回身體節奏'
+          : '讓成人學員更安心預約與持續練習';
+    const photoDirection = isSenior
+      ? '長輩在明亮教室做溫和伸展，表情安心、有陪伴感'
+      : isCamp
+        ? '小朋友在教練陪伴下挑戰運動，畫面有活力但不混亂'
+        : isYoga
+          ? '成人女性或上班族在瑜伽墊上做伸展/流動動作，乾淨、柔和、專注'
+          : '成人學員在教室中練習，畫面穩定、有持續上課的安心感';
+
+    return `Canva 製圖包｜${task.theme}
+
+設計尺寸：
+- IG 貼文 4:5（1080 x 1350）優先
+- 也可延伸成 LINE 圖文 1:1、限動 9:16
+
+圖片主題：
+${task.theme}
+
+目標客群：
+${task.audience}
+
+主標題：
+${slogan}
+
+副標：
+${subtitle}
+
+畫面方向：
+${photoDirection}
+
+版面建議：
+- 上方 20%：小字標示「武樂運動空間」
+- 中間 50%：放主照片或雙照片拼貼，保留人物完整動作
+- 下方 30%：主標題 + 副標 + 行動提醒
+- 右下角放 CTA：私訊預約體驗 / 回覆想了解
+
+色系：
+米白、淺綠、溫暖橘，搭配黑白文字。不要太花，不要像補習班傳單。
+
+圖片中文字：
+${task.theme}
+${slogan}
+${subtitle}
+私訊預約體驗
+
+搭配文案：
+${makeLineCopy({ task, topic, slogan })}
+
+不可出現：
+不要醫療感、不要復健中心感、不要像醫院、不要過度激烈、不要廉價促銷感、${isYoga ? '不要小朋友或營隊感' : '不要文字塞滿畫面'}。
+
+給 Canva AI 的一句話：
+請做一張溫暖、明亮、乾淨、有信任感的社群宣傳圖，主題是「${task.theme}」，對象是「${task.audience}」，使用上述標題與副標，畫面要像專業運動教室的品牌宣傳，而不是一般廣告模板。`;
+  }
+
   function labelForType(type) {
-    return { smart: '平台文案', line: 'LINE 文案', ig: 'IG 文案', facebook: 'Facebook 社團文案', dm: '私訊追蹤文案', image: '圖片製作提示詞', optimize: '優化文案', next: '下一步追蹤建議' }[type];
+    return { smart: '平台文案', line: 'LINE 文案', ig: 'IG 文案', facebook: 'Facebook 社團文案', dm: '私訊追蹤文案', image: '圖片製作提示詞', canva: 'Canva 製圖包', optimize: '優化文案', next: '下一步追蹤建議' }[type];
   }
 
   function renderTrackingStages() {
