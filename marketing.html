@@ -33,9 +33,11 @@
     </div>
 
     <div class="content">
+      <div class="daily-grid" id="dailyBrief"></div>
+
       <div class="marketing-hero">
         <div class="card">
-          <div class="section-title">本月建議宣傳排程 <span>可一鍵轉成下方任務卡</span></div>
+          <div class="section-title">本週宣傳方向 <span>不用重想，照這個節奏補任務</span></div>
           <div id="monthPlan" class="month-plan"></div>
         </div>
         <div class="card">
@@ -48,7 +50,7 @@
       </div>
 
       <div class="card">
-        <div class="section-title">行銷月曆 <span id="taskCount"></span></div>
+        <div class="section-title">任務清單 <span id="taskCount"></span></div>
         <div class="filters">
           <select id="platformFilter" onchange="renderTasks()"></select>
           <select id="statusFilter" onchange="renderTasks()"></select>
@@ -58,7 +60,7 @@
       </div>
 
       <div class="card">
-        <div class="section-title">客戶追蹤建議 <span>依客戶分類快速產生下一步</span></div>
+        <div class="section-title">客戶追蹤建議 <span>今天不知道追誰時先看這裡</span></div>
         <div class="filters">
           <select id="trackingCategory" onchange="renderTrackingAdvice()">
             <option value="trial_class">體驗課</option>
@@ -71,8 +73,10 @@
       </div>
 
       <div class="card">
-        <div class="section-title">宣傳主題資料庫 <span>AI 文案會依這些定位與語氣產出</span></div>
-        <div id="topicGrid" class="marketing-grid"></div>
+        <details class="simple-section">
+          <summary>宣傳主題資料庫</summary>
+          <div id="topicGrid" class="marketing-grid"></div>
+        </details>
       </div>
     </div>
   </div>
@@ -175,6 +179,15 @@
       points: ['教室有聽到大家對停課的感受', '後續會調整課程安排，提升開課穩定度', '優先保留需求較穩定的時段', '部分課程可能調整成主題課、小班課或體驗活動', '讓學員知道教室正在處理，而不是放著不管'],
       courses: ['成人拳擊', '哈達瑜伽', 'ARC 脊椎訓練', '主題小班課'],
       slogans: ['我們有聽到大家對課程穩定度的在意', '接下來會把時段安排得更清楚、更安心', '讓成人學員可以更放心預約與持續練習']
+    },
+    {
+      key: 'adult_yoga',
+      title: '成人瑜伽與身心流動',
+      color: '#6c5ce7',
+      position: '成人瑜伽不是追求高難度，而是讓忙碌的大人重新找回呼吸、穩定與身體覺察。',
+      points: ['阿斯坦加適合想建立規律、力量與專注的成人', '輕流動瑜伽適合想放鬆、伸展、慢慢恢復活動量的人', '下班後上課可以把緊繃身體慢慢鬆開', '適合久坐、壓力大、想培養固定運動習慣的學員', '文案要避免像營隊，主軸放在成人身體照顧與生活節奏'],
+      courses: ['阿斯坦加瑜伽', '輕流動瑜伽', '哈達瑜伽', '溫和伸展', '瑜伽輪'],
+      slogans: ['下班後，把身體慢慢帶回舒服的節奏', '不是要做到很厲害，是先讓自己穩定下來', '用一堂瑜伽，把緊繃的身體鬆開一點', '阿斯坦加建立力量，輕流動找回呼吸']
     }
   ];
 
@@ -227,6 +240,7 @@
 
   function renderAll() {
     renderPlanPreview();
+    renderDailyBrief();
     renderTasks();
     renderTopics();
     renderTrackingStages();
@@ -235,38 +249,105 @@
 
   function renderPlanPreview() {
     const plan = [
-      ['第1週', '樂齡運動觀念文', '暑假營隊特色介紹', '現有學員安心公告'],
-      ['第2週', '樂齡課程單堂介紹', '營隊戶外教學亮點', '私訊追蹤舊生家長'],
-      ['第3週', '樂齡學員招募文', '營隊倒數優惠文', '成人課程主題推廣'],
-      ['第4週', '成效回顧', '下月課表預告', '續購與未成交追蹤']
+      ['週一', 'LINE：本週主打課程', '私訊：未成交追蹤'],
+      ['週三', 'IG：課程畫面與學員情境', '補人：人數不足時段'],
+      ['週五', 'FB 社團：在地客群招募', '現場：下週課表提醒'],
+      ['週日', '成效回顧', '排下週任務']
     ];
     document.getElementById('monthPlan').innerHTML = plan.map(week => `
       <div class="week-box">
         <strong>${week[0]}</strong>
         <div>${week[1]}</div>
         <div>${week[2]}</div>
-        <div>${week[3]}</div>
+        ${week[3] ? `<div>${week[3]}</div>` : ''}
       </div>
     `).join('');
+  }
+
+  function getTodayString() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function getPendingTasks() {
+    const today = getTodayString();
+    return loadTasks()
+      .filter(t => (t.publishStatus || '待規劃') !== '已發布')
+      .sort((a, b) => {
+        const ad = a.date || '9999-99-99';
+        const bd = b.date || '9999-99-99';
+        if ((ad <= today) !== (bd <= today)) return ad <= today ? -1 : 1;
+        return ad.localeCompare(bd);
+      });
+  }
+
+  function renderDailyBrief() {
+    const pending = getPendingTasks();
+    const today = getTodayString();
+    const due = pending.find(t => (t.date || '') <= today) || pending[0];
+    const follow = pending.find(t => t.platform === '私訊追蹤' || /追蹤|未成交|舊生|體驗/.test(t.theme + t.goal));
+    const fillClass = pending.find(t => /補人|低人數|停課|成人|瑜伽|拳擊/.test(t.theme + t.goal + t.audience));
+    const segment = pending.find(t => /樂齡|65|長輩|營隊|家長|成人|瑜伽/.test(t.theme + t.audience)) || due;
+
+    const cards = [
+      {
+        title: '今天該發什麼',
+        color: '#0984e3',
+        main: due ? `${due.platform}｜${due.theme}` : '先新增一個本週主打任務',
+        sub: due ? `目的：${due.goal || '推動詢問或預約'}` : '建議先排 LINE 主打、IG 情境文、私訊追蹤各一則。'
+      },
+      {
+        title: '今天該追蹤誰',
+        color: '#e17055',
+        main: follow ? follow.audience : '體驗後未購買、問過營隊未報名、瑜伽詢問未預約',
+        sub: follow ? `${follow.theme}：先用低壓提醒，不要硬推。` : '從最近 7 天問過但還沒預約/付款的人開始。'
+      },
+      {
+        title: '哪堂課要補人',
+        color: '#d63031',
+        main: fillClass ? fillClass.theme : '成人瑜伽、成人課程、低人數時段',
+        sub: fillClass ? `推給：${fillClass.audience}` : '若快低於開課門檻，今天優先發 LINE 與私訊舊生。'
+      },
+      {
+        title: '客群推什麼',
+        color: '#00b894',
+        main: segment ? segment.audience : '成人瑜伽 / 樂齡 / 暑假營隊家長',
+        sub: segment ? suggestSegmentAngle(segment) : '成人推放鬆與規律；樂齡推安全陪伴；營隊推成長與戶外。'
+      }
+    ];
+
+    document.getElementById('dailyBrief').innerHTML = cards.map(c => `
+      <div class="daily-card" style="border-top-color:${c.color}">
+        <strong>${escapeHtml(c.title)}</strong>
+        <div class="daily-main">${escapeHtml(c.main)}</div>
+        <div class="daily-sub">${escapeHtml(c.sub)}</div>
+      </div>
+    `).join('');
+  }
+
+  function suggestSegmentAngle(task) {
+    const topic = findTopic(task);
+    if (topic.key === 'adult_yoga') return '主打下班後放鬆、久坐伸展、重新建立運動習慣。';
+    if (topic.key === 'senior') return '主打安全、溫和、有人陪伴，也可以請子女幫爸媽安排。';
+    if (topic.key === 'camp') return '主打孩子離開螢幕、運動挑戰、戶外教學與成長感。';
+    return '主打課程穩定、時段清楚、讓學員可以安心預約。';
   }
 
   function generateMonthPlan() {
     const [year, month] = document.getElementById('monthInput').value.split('-').map(Number);
     const templates = [
-      ['樂齡運動觀念文', '65歲以上長輩與子女', 'LINE 官方帳號', '建立安全運動觀念與詢問意願'],
+      ['本週 LINE 主打：阿斯坦加瑜伽', '30歲以上成人與下班後想運動的人', 'LINE 官方帳號', '提高成人瑜伽曝光'],
+      ['IG：輕流動瑜伽情境文', '久坐、壓力大、想伸展放鬆的成人', 'IG 貼文', '讓新客理解輕流動適合入門'],
+      ['私訊追蹤：瑜伽體驗未報名', '問過瑜伽但尚未預約者', '私訊追蹤', '邀請預約本週體驗'],
+      ['補人：成人課程低人數時段', '成人運動學員', 'LINE 官方帳號', '提高開課穩定度'],
+      ['樂齡運動觀念文', '65歲以上長輩與子女', 'Facebook 社團', '建立安全運動觀念與詢問意願'],
       ['2026 暑假營隊特色介紹', '國小家長與小朋友', 'IG 貼文', '讓家長理解營隊不是只有放電'],
-      ['成人課程安心公告', '既有成人課程學員', 'LINE 官方帳號', '修復停課疑慮並建立信任'],
-      ['樂齡課程單堂介紹', '想溫和運動的長輩', 'Facebook 社團', '推廣適合入門的課程'],
       ['營隊戶外教學亮點', '重視孩子戶外體驗的家長', 'IG 限動', '增加營隊期待感'],
-      ['私訊追蹤舊生家長', '舊生家長', '私訊追蹤', '提醒優惠與週次名額'],
-      ['樂齡學員招募文', '65歲以上長輩與子女', 'Facebook 社團', '招募體驗與預約參觀'],
-      ['營隊倒數優惠文', '尚未報名的家長', 'LINE 官方帳號', '推動報名決策'],
-      ['成人課程主題推廣', '成人運動學員', 'IG 貼文', '提高成人課程參與動機'],
-      ['成效回顧', '內部團隊', '現場公告', '記錄本月有效素材'],
-      ['下月課表預告', '全體學員', 'LINE 官方帳號', '提前安排預約與續購'],
-      ['續購與未成交追蹤', '體驗未購買與舊生', '私訊追蹤', '把詢問轉成下一步行動']
+      ['舊生家長營隊追蹤', '舊生家長', '私訊追蹤', '提醒優惠與週次名額'],
+      ['下週課表預告', '全體學員', 'LINE 官方帳號', '提前安排預約與續購'],
+      ['本週成效回顧', '內部團隊', '現場公告', '記錄有效素材']
     ];
-    const dates = [2, 4, 6, 9, 11, 13, 16, 18, 20, 23, 25, 27];
+    const dates = [2, 4, 5, 7, 9, 12, 14, 16, 23, 27];
     const newTasks = templates.map((t, i) => ({
       id: crypto.randomUUID(),
       date: `${year}-${String(month).padStart(2, '0')}-${String(dates[i]).padStart(2, '0')}`,
@@ -304,34 +385,31 @@
     }
 
     document.getElementById('taskGrid').innerHTML = tasks.map(t => `
-      <div class="task-card">
-        <div style="display:flex;justify-content:space-between;gap:10px">
+      <div class="task-card compact">
+        <div class="task-row-head">
           <div>
             <div style="font-size:12px;color:#636e72">${escapeHtml(t.date)}</div>
             <div class="task-title">${escapeHtml(t.theme)}</div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="openTaskModal('${t.id}')">編輯</button>
+          <select onchange="updateTaskField('${t.id}','publishStatus',this.value);renderTasks()">
+            ${TASK_STATUSES.map(s => `<option value="${s}" ${s === t.publishStatus ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
         </div>
         <div class="task-meta">
           <span class="badge" style="background:#0984e320;color:#0984e3;border:1px solid #0984e340">${escapeHtml(t.platform)}</span>
           <span class="badge" style="background:#00b89420;color:#00b894;border:1px solid #00b89440">${escapeHtml(t.audience)}</span>
         </div>
         <div class="task-purpose">${escapeHtml(t.goal || '尚未填寫宣傳目的')}</div>
-        <div class="status-selects">
-          ${statusControl(t.id, 'copyStatus', t.copyStatus)}
-          ${statusControl(t.id, 'imageStatus', t.imageStatus)}
-          ${statusControl(t.id, 'publishStatus', t.publishStatus)}
-        </div>
         <textarea class="inline-textarea mt-8" placeholder="成效紀錄" onblur="updateTaskField('${t.id}','result',this.value)">${escapeHtml(t.result)}</textarea>
-        <textarea class="inline-textarea mt-8" placeholder="備註" onblur="updateTaskField('${t.id}','notes',this.value)">${escapeHtml(t.notes)}</textarea>
         <div class="task-actions">
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','line')">產生 LINE 文案</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','ig')">產生 IG 文案</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','facebook')">產生 Facebook 社團文案</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','dm')">產生私訊追蹤文案</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','image')">產生圖片製作提示詞</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','optimize')">重新優化文案</button>
-          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','next')" style="grid-column:1/-1">產生下一步追蹤建議</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','smart')">產文案</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','dm')">追蹤訊息</button>
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','image')">圖片提示</button>
+          <button class="btn btn-success btn-sm" onclick="markPublished('${t.id}')">已發布</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-secondary btn-sm" onclick="generateAi('${t.id}','next')" style="flex:1">下一步</button>
+          <button class="btn btn-secondary btn-sm" onclick="openTaskModal('${t.id}')" style="flex:1">編輯</button>
         </div>
       </div>
     `).join('');
@@ -349,6 +427,13 @@
     task[field] = value;
     task.updatedAt = new Date().toISOString();
     saveTasks(tasks);
+    renderDailyBrief();
+  }
+
+  function markPublished(id) {
+    updateTaskField(id, 'publishStatus', '已發布');
+    updateTaskField(id, 'copyStatus', '已發布');
+    renderTasks();
   }
 
   function openTaskModal(id) {
@@ -398,7 +483,7 @@
     else tasks.push({ ...body, createdAt: new Date().toISOString() });
     saveTasks(tasks);
     closeTaskModal();
-    renderTasks();
+    renderAll();
   }
 
   function deleteTask() {
@@ -406,15 +491,16 @@
     if (!id || !confirm('確定刪除這個行銷任務？')) return;
     saveTasks(loadTasks().filter(t => t.id !== id));
     closeTaskModal();
-    renderTasks();
+    renderAll();
   }
 
   function findTopic(task) {
     const text = `${task.theme} ${task.audience} ${task.goal}`.toLowerCase();
+    if (/瑜伽|yoga|阿斯坦加|ashtanga|輕流動|哈達|伸展|流動/.test(text)) return topics[3];
     if (text.includes('樂齡') || text.includes('65') || text.includes('長輩')) return topics[0];
     if (text.includes('營隊') || text.includes('暑假') || text.includes('孩子') || text.includes('家長')) return topics[1];
     if (text.includes('成人') || text.includes('停課') || text.includes('穩定')) return topics[2];
-    return topics[1];
+    return topics[2];
   }
 
   function generateAi(id, type) {
@@ -424,6 +510,7 @@
     const slogan = topic.slogans[0];
     const base = { task, topic, slogan };
     const generators = {
+      smart: makeSmartCopy,
       line: makeLineCopy,
       ig: makeIgCopy,
       facebook: makeFacebookCopy,
@@ -441,6 +528,14 @@
     renderTasks();
   }
 
+  function makeSmartCopy(base) {
+    const platform = base.task.platform || '';
+    if (platform.includes('IG')) return makeIgCopy(base);
+    if (platform.includes('Facebook')) return makeFacebookCopy(base);
+    if (platform.includes('私訊')) return makeDmCopy(base);
+    return makeLineCopy(base);
+  }
+
   function makeLineCopy({ task, topic, slogan }) {
     return `【${task.theme}】\n${slogan}\n\n${topic.position}\n\n這次想邀請：${task.audience}\n適合方向：${topic.courses.slice(0, 3).join('、')}\n\n如果你想了解課程、體驗時段或報名方式，直接回覆「想了解」，我們會幫你安排適合的下一步。`;
   }
@@ -450,6 +545,9 @@
   }
 
   function makeFacebookCopy({ task, topic, slogan }) {
+    if (topic.key === 'adult_yoga') {
+      return `跟青埔附近想運動、但不想一開始就太有壓力的大人分享：武樂最近有「${task.theme}」。\n\n${topic.position}\n\n阿斯坦加比較適合想建立規律和力量的人；輕流動瑜伽則適合久坐、壓力大、想慢慢伸展放鬆的人。\n\n如果你一直想開始運動，但又擔心跟不上，可以先從體驗課開始，我們會依你的狀態建議適合的課。`;
+    }
     return `跟附近的家長和朋友分享一個武樂最近在推的方向：${task.theme}。\n\n${topic.position}\n\n我們希望這件事不是硬推課程，而是真的回到大家的需求：${task.goal || '找到適合自己的運動安排'}。\n\n${topic.points.slice(0, 3).join('、')}。\n\n如果你家裡剛好有需要，或想先問問看適不適合，都可以私訊我們。`;
   }
 
@@ -469,11 +567,12 @@
   function makeImagePrompt({ task, topic, slogan }) {
     const isSenior = topic.key === 'senior';
     const isCamp = topic.key === 'camp';
-    return `圖片主題：${task.theme}\n目標客群：${task.audience}\n主要標題：${slogan}\n副標：${isSenior ? '溫和、安全、有人陪伴的樂齡友善課程' : isCamp ? '讓孩子離開螢幕，走進真正的運動冒險' : '讓成人學員更安心預約與持續練習'}\n畫面風格：溫暖、明亮、乾淨、有信任感\n人物設定：${isSenior ? '健康開心的長輩，正在做簡單伸展或輕運動' : isCamp ? '小朋友在教練陪伴下進行運動挑戰，表情專注開心' : '成人學員在明亮教室中專注練習，氣氛穩定安心'}\n背景設定：乾淨明亮的武樂運動教室\n色系：米白、淺綠、溫暖橘，搭配武樂品牌黑白作為輔助\n版面比例：1:1、4:5、16:9 可選\n圖片中文字：${task.theme}｜${slogan}\n不可出現的元素：不要醫療感、不要復健中心感、不要太像醫院、不要過度激烈或危險動作`;
+    const isYoga = topic.key === 'adult_yoga';
+    return `圖片主題：${task.theme}\n目標客群：${task.audience}\n主要標題：${slogan}\n副標：${isSenior ? '溫和、安全、有人陪伴的樂齡友善課程' : isCamp ? '讓孩子離開螢幕，走進真正的運動冒險' : isYoga ? '下班後放鬆伸展，重新找回身體節奏' : '讓成人學員更安心預約與持續練習'}\n畫面風格：溫暖、明亮、乾淨、有信任感\n人物設定：${isSenior ? '健康開心的長輩，正在做簡單伸展或輕運動' : isCamp ? '小朋友在教練陪伴下進行運動挑戰，表情專注開心' : isYoga ? '成人學員在瑜伽墊上做穩定伸展或流動動作，表情放鬆專注' : '成人學員在明亮教室中專注練習，氣氛穩定安心'}\n背景設定：乾淨明亮的武樂運動教室\n色系：米白、淺綠、溫暖橘，搭配武樂品牌黑白作為輔助\n版面比例：1:1、4:5、16:9 可選\n圖片中文字：${task.theme}｜${slogan}\n不可出現的元素：不要醫療感、不要復健中心感、不要太像醫院、不要營隊感、不要小朋友主視覺、不要過度激烈或危險動作`;
   }
 
   function labelForType(type) {
-    return { line: 'LINE 文案', ig: 'IG 文案', facebook: 'Facebook 社團文案', dm: '私訊追蹤文案', image: '圖片製作提示詞', optimize: '優化文案', next: '下一步追蹤建議' }[type];
+    return { smart: '平台文案', line: 'LINE 文案', ig: 'IG 文案', facebook: 'Facebook 社團文案', dm: '私訊追蹤文案', image: '圖片製作提示詞', optimize: '優化文案', next: '下一步追蹤建議' }[type];
   }
 
   function renderTrackingStages() {

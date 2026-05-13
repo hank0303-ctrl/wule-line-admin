@@ -342,6 +342,79 @@ tr:hover td { background: #f8f9fa; cursor: pointer; }
   align-items: stretch;
 }
 
+.daily-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.daily-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  border-top: 3px solid #0984e3;
+  min-height: 142px;
+}
+
+.daily-card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.daily-card .daily-main {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #2d3436;
+  margin-bottom: 8px;
+}
+
+.daily-card .daily-sub {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #636e72;
+}
+
+.simple-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.task-card.compact .task-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.task-card.compact textarea {
+  min-height: 42px;
+}
+
+.task-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.task-row-head select {
+  width: 118px;
+  padding: 7px 8px;
+  border: 1px solid #dfe6e9;
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
+}
+
+details.simple-section > summary {
+  cursor: pointer;
+  color: #0984e3;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
 .section-title {
   font-weight: 600;
   margin-bottom: 12px;
@@ -477,10 +550,13 @@ tr:hover td { background: #f8f9fa; cursor: pointer; }
   .sidebar { display: none; }
   .detail-layout { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .daily-grid { grid-template-columns: 1fr; }
   .marketing-hero { grid-template-columns: 1fr; }
   .month-plan { grid-template-columns: 1fr; }
   .status-selects { grid-template-columns: 1fr; }
+  .simple-actions { grid-template-columns: 1fr; }
   .task-actions { grid-template-columns: 1fr; }
+  .task-card.compact .task-actions { grid-template-columns: 1fr; }
   .content { padding: 16px; }
   .topbar { align-items: flex-start; gap: 10px; flex-direction: column; }
 }
